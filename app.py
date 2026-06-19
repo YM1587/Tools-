@@ -180,7 +180,7 @@ def run_transcription(
 
             progress(1.0, desc="Done!")
             summary = (
-                f"✅  Language: {info.language.upper()} "
+                f"Language: {info.language.upper()} "
                 f"({info.language_probability:.0%} confidence) | "
                 f"Audio: {info.duration/60:.1f} min"
             )
@@ -208,7 +208,7 @@ theme = gr.themes.Base(
 
 with gr.Blocks() as demo:
 
-    gr.HTML('<h1 id="title">🎙️ Free Transcriber</h1>')
+    gr.HTML('<h1 id="title">MyFreeTranscriber</h1>')
     gr.HTML('<p id="subtitle">Powered by OpenAI Whisper · runs 100% on your machine · no subscriptions</p>')
 
     with gr.Row():
@@ -241,7 +241,7 @@ with gr.Blocks() as demo:
                 label="Output format",
             )
 
-    with gr.Accordion("👥  Speaker identification (who said what)", open=False):
+    with gr.Accordion("Speaker identification (who said what)", open=False):
         gr.Markdown(
             "Identifies which speaker said each line. Requires a **free** HuggingFace token.\n\n"
             "**Steps:** [1] Sign up at huggingface.co  "
