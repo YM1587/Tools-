@@ -2,17 +2,14 @@
 app.py — Free Transcriber Web UI
 Run locally:  python app.py
 Then open:    http://localhost:7860
-
 Anyone on your network can use it at http://YOUR_IP:7860
 Deploy free to HuggingFace Spaces: just upload this file + requirements.txt
 """
 
 import os
-import sys
 import time
 import tempfile
 import subprocess
-from pathlib import Path
 
 import gradio as gr
 from faster_whisper import WhisperModel
@@ -79,14 +76,14 @@ def run_transcription(
 
     try:
         with tempfile.TemporaryDirectory() as tmp:
-            progress(0.05, "Loading Whisper model...")
+            progress(0.05, desc="Loading Whisper model...")
             model = get_model(model_size)
 
             diar_segs = []
             if enable_diarization:
                 if not hf_token or not hf_token.strip().startswith("hf_"):
                     return (
-                        "⚠️  Speaker identification needs a HuggingFace token.\n\n"
+                        "Speaker identification needs a HuggingFace token.\n\n"
                         "Steps:\n"
                         "1. Create a free account at https://huggingface.co\n"
                         "2. Accept terms at https://huggingface.co/pyannote/speaker-diarization-3.1\n"
@@ -94,10 +91,10 @@ def run_transcription(
                         "4. Paste it in the HF Token box and try again.",
                         None
                     )
-                progress(0.15, "Extracting audio for speaker detection...")
+                progress(0.15, desc="Extracting audio for speaker detection...")
                 wav_path = extract_wav(audio_file, tmp)
 
-                progress(0.25, "Detecting speakers (downloads model once)...")
+                progress(0.25, desc="Detecting speakers (downloads model once)...")
                 try:
                     import torch
                     from pyannote.audio import Pipeline
@@ -107,14 +104,17 @@ def run_transcription(
                     )
                     pipeline.to(torch.device("cpu"))
                     kwargs = {}
-                    if num_speakers and num_speakers > 0:
+                    if num_speakers and int(num_speakers) > 0:
                         kwargs["num_speakers"] = int(num_speakers)
                     diarization = pipeline(wav_path, **kwargs)
-                    diar_segs = [(t.start, t.end, spk) for t, _, spk in diarization.itertracks(yield_label=True)]
+                    diar_segs = [
+                        (t.start, t.end, spk)
+                        for t, _, spk in diarization.itertracks(yield_label=True)
+                    ]
                 except Exception as e:
                     return f"Speaker detection error: {e}\n\nMake sure you accepted the model terms on HuggingFace.", None
 
-            progress(0.40, "Transcribing speech...")
+            progress(0.40, desc="Transcribing speech...")
             segments, info = model.transcribe(
                 audio_file,
                 language=lang,
@@ -127,7 +127,7 @@ def run_transcription(
                 condition_on_previous_text=False,
             )
 
-            progress(0.75, "Formatting output...")
+            progress(0.75, desc="Formatting output...")
             seg_list = list(segments)
             lines = []
 
@@ -141,13 +141,13 @@ def run_transcription(
                     speaker = assign_speaker(seg.start, seg.end, diar_segs)
                     if speaker != current_speaker:
                         if buffer:
-                            lines.append(f"\n**{current_speaker}**\n{' '.join(buffer)}")
+                            lines.append(f"\n{current_speaker}:\n{' '.join(buffer)}")
                         current_speaker = speaker
                         buffer = [text]
                     else:
                         buffer.append(text)
                 if buffer:
-                    lines.append(f"\n**{current_speaker}**\n{' '.join(buffer)}")
+                    lines.append(f"\n{current_speaker}:\n{' '.join(buffer)}")
                 transcript_text = "\n".join(lines)
 
             elif output_format == "SRT subtitles":
@@ -166,24 +166,24 @@ def run_transcription(
                         lines.append(f"[{seg.start:.1f}s] {t}")
                 transcript_text = "\n".join(lines)
 
-            else:  # Plain text
+            else:
                 transcript_text = " ".join(
                     seg.text.strip() for seg in seg_list if seg.text.strip()
                 )
 
-            # Save output file
             ext = "srt" if output_format == "SRT subtitles" else "txt"
-            out_path = os.path.join(tmp, f"transcript.{ext}")
-            with open(out_path, "w", encoding="utf-8") as f:
-                f.write(transcript_text)
-
-            # Copy to a stable temp location gradio can serve
-            stable_path = os.path.join(tempfile.gettempdir(), f"transcript_{int(time.time())}.{ext}")
+            stable_path = os.path.join(
+                tempfile.gettempdir(), f"transcript_{int(time.time())}.{ext}"
+            )
             with open(stable_path, "w", encoding="utf-8") as f:
                 f.write(transcript_text)
 
-            progress(1.0, "Done!")
-            summary = f"✅  Language: {info.language.upper()} ({info.language_probability:.0%} confidence) | Audio: {info.duration/60:.1f} min"
+            progress(1.0, desc="Done!")
+            summary = (
+                f"✅  Language: {info.language.upper()} "
+                f"({info.language_probability:.0%} confidence) | "
+                f"Audio: {info.duration/60:.1f} min"
+            )
             return f"{summary}\n\n{transcript_text}", stable_path
 
     except Exception as e:
@@ -192,23 +192,21 @@ def run_transcription(
 
 # ── UI ────────────────────────────────────────────────────────────────────────
 
-with gr.Blocks(
-    title="Free Transcriber",
-    theme=gr.themes.Base(
-        primary_hue="slate",
-        neutral_hue="slate",
-        font=gr.themes.GoogleFont("Inter"),
-    ),
-    css="""
-    .gradio-container { max-width: 860px !important; margin: 0 auto; }
-    #title { text-align: center; padding: 24px 0 8px; }
-    #subtitle { text-align: center; color: #64748b; margin-bottom: 24px; font-size: 0.95rem; }
-    #run-btn { background: #1e293b !important; border: none !important; }
-    #run-btn:hover { background: #334155 !important; }
-    .section-label { font-weight: 600; font-size: 0.8rem; letter-spacing: 0.06em;
-                     text-transform: uppercase; color: #94a3b8; margin-bottom: 4px; }
-    """
-) as demo:
+css = """
+.gradio-container { max-width: 860px !important; margin: 0 auto; }
+#title { text-align: center; padding: 24px 0 4px; }
+#subtitle { text-align: center; color: #64748b; margin-bottom: 20px; font-size: 0.95rem; }
+#run-btn { background: #1e293b !important; border: none !important; }
+#run-btn:hover { background: #334155 !important; }
+"""
+
+theme = gr.themes.Base(
+    primary_hue="slate",
+    neutral_hue="slate",
+    font=gr.themes.GoogleFont("Inter"),
+)
+
+with gr.Blocks() as demo:
 
     gr.HTML('<h1 id="title">🎙️ Free Transcriber</h1>')
     gr.HTML('<p id="subtitle">Powered by OpenAI Whisper · runs 100% on your machine · no subscriptions</p>')
@@ -220,7 +218,6 @@ with gr.Blocks(
                 file_types=[".mp3", ".wav", ".m4a", ".flac", ".ogg",
                             ".mp4", ".mkv", ".mov", ".avi", ".webm"],
             )
-
         with gr.Column(scale=2):
             model_size = gr.Dropdown(
                 ["tiny", "base", "small", "medium", "large-v3"],
@@ -247,7 +244,7 @@ with gr.Blocks(
     with gr.Accordion("👥  Speaker identification (who said what)", open=False):
         gr.Markdown(
             "Identifies which speaker said each line. Requires a **free** HuggingFace token.\n\n"
-            "Steps: [1] Sign up at huggingface.co  "
+            "**Steps:** [1] Sign up at huggingface.co  "
             "[2] Accept terms at [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)  "
             "[3] Get a token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)"
         )
@@ -260,20 +257,18 @@ with gr.Blocks(
                 max_lines=1,
             )
             num_speakers = gr.Number(
-                label="Number of speakers (optional — leave 0 to auto-detect)",
+                label="Number of speakers (0 = auto-detect)",
                 value=0, minimum=0, maximum=20, precision=0
             )
 
     run_btn = gr.Button("▶  Transcribe", variant="primary", elem_id="run-btn")
 
-    with gr.Column():
-        output_text = gr.Textbox(
-            label="Transcript",
-            lines=18,
-            show_copy_button=True,
-            interactive=False,
-        )
-        download_file = gr.File(label="Download transcript", visible=True)
+    output_text = gr.Textbox(
+        label="Transcript",
+        lines=18,
+        interactive=False,
+    )
+    download_file = gr.File(label="Download transcript")
 
     run_btn.click(
         fn=run_transcription,
@@ -288,10 +283,14 @@ with gr.Blocks(
     gr.Markdown(
         "---\n"
         "**Tip:** First run downloads the Whisper model (~240 MB for `small`). "
-        "Every run after that is instant and fully offline. "
-        "Share this tool with anyone by pointing them to `http://YOUR_IP:7860` while `app.py` is running, "
-        "or deploy it free to [HuggingFace Spaces](https://huggingface.co/spaces)."
+        "Every run after that is instant and fully offline."
     )
 
 if __name__ == "__main__":
-    demo.launch(share=False, server_name="0.0.0.0", server_port=7860)
+    demo.launch(
+        share=False,
+        server_name="0.0.0.0",
+        server_port=7860,
+        theme=theme,
+        css=css,
+    )
