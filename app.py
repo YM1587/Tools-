@@ -2,8 +2,6 @@
 app.py — Free Transcriber Web UI
 Run locally:  python app.py
 Then open:    http://localhost:7860
-Anyone on your network can use it at http://YOUR_IP:7860
-Deploy free to HuggingFace Spaces: just upload this file + requirements.txt
 """
 
 import os
@@ -97,6 +95,27 @@ def run_transcription(
                 progress(0.25, desc="Detecting speakers (downloads model once)...")
                 try:
                     import torch
+                    import torchaudio
+                    import importlib
+                    if not hasattr(torchaudio, 'AudioMetaData'):
+                        _found = False
+                        for _mod in ['torchaudio.backend.common', 'torchaudio._backend',
+                                     'torchaudio.backend.soundfile_backend']:
+                            try:
+                                _m = importlib.import_module(_mod)
+                                if hasattr(_m, 'AudioMetaData'):
+                                    torchaudio.AudioMetaData = _m.AudioMetaData
+                                    _found = True
+                                    break
+                            except Exception:
+                                continue
+                        if not _found:
+                            from collections import namedtuple
+                            torchaudio.AudioMetaData = namedtuple(
+                                'AudioMetaData',
+                                ['sample_rate', 'num_frames', 'num_channels',
+                                 'bits_per_sample', 'encoding']
+                            )
                     from pyannote.audio import Pipeline
                     try:
                         pipeline = Pipeline.from_pretrained(
