@@ -100,7 +100,7 @@ def run_transcription(
                     from pyannote.audio import Pipeline
                     pipeline = Pipeline.from_pretrained(
                         "pyannote/speaker-diarization-3.1",
-                        use_auth_token=hf_token.strip()
+                        token=hf_token.strip()
                     )
                     pipeline.to(torch.device("cpu"))
                     kwargs = {}
@@ -208,7 +208,7 @@ theme = gr.themes.Base(
 
 with gr.Blocks() as demo:
 
-    gr.HTML('<h1 id="title">MyFreeTranscriber</h1>')
+    gr.HTML('<h1 id="title">Free Transcriber</h1>')
     gr.HTML('<p id="subtitle">Powered by OpenAI Whisper · runs 100% on your machine · no subscriptions</p>')
 
     with gr.Row():
