@@ -1,6 +1,5 @@
 """
-transcribe_diarize.py
-----------------------
+
 Transcribe audio/video WITH speaker labels (SPEAKER_00, SPEAKER_01, etc.)
 by combining faster-whisper (speech-to-text) with pyannote.audio (who is speaking when).
 
@@ -77,7 +76,7 @@ def diarize(wav_path: Path, hf_token: str, num_speakers=None):
     print("   Loading speaker diarization model (downloads once)...")
     pipeline = Pipeline.from_pretrained(
         "pyannote/speaker-diarization-3.1",
-        use_auth_token=hf_token
+        token=hf_token
     )
     pipeline.to(torch.device("cpu"))
 
